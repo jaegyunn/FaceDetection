@@ -1,117 +1,93 @@
-/**
- * Sample React Native App
- * https://github.com/facebook/react-native
- *
- * @format
- */
+import React, {useState, useRef, useCallback} from 'react';
+import {StyleSheet, View, Text, TouchableOpacity} from 'react-native';
+import {Camera, useCameraDevices} from 'react-native-vision-camera';
+import {Face} from 'react-native-face-detection';
+import {detectFaces} from 'react-native-face-detection';
 
-import React from 'react';
-import type {PropsWithChildren} from 'react';
-import {
-  SafeAreaView,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  useColorScheme,
-  View,
-} from 'react-native';
+const App = () => {
+  const [hasPermission, setHasPermission] = useState(false);
+  const [faces, setFaces] = useState<Face[]>([]);
+  const camera = useRef<Camera>(null);
+  const devices = useCameraDevices();
+  const device = devices.front;
 
-import {
-  Colors,
-  DebugInstructions,
-  Header,
-  LearnMoreLinks,
-  ReloadInstructions,
-} from 'react-native/Libraries/NewAppScreen';
+  React.useEffect(() => {
+    (async () => {
+      const status = await Camera.requestCameraPermission();
+      setHasPermission(status === 'authorized');
+    })();
+  }, []);
 
-type SectionProps = PropsWithChildren<{
-  title: string;
-}>;
+  const onFacesDetected = useCallback((detectedFaces: Face[]) => {
+    setFaces(detectedFaces);
+  }, []);
 
-function Section({children, title}: SectionProps): React.JSX.Element {
-  const isDarkMode = useColorScheme() === 'dark';
+  const takePicture = useCallback(async () => {
+    if (camera.current) {
+      const photo = await camera.current.takePhoto();
+      const detectedFaces = await detectFaces(photo.path);
+      onFacesDetected(detectedFaces);
+    }
+  }, [onFacesDetected]);
+
+  if (!hasPermission) {
+    return <Text>카메라 권한이 필요합니다</Text>;
+  }
+
+  if (device == null) {
+    return <Text>카메라를 불러오는 중...</Text>;
+  }
+
   return (
-    <View style={styles.sectionContainer}>
-      <Text
-        style={[
-          styles.sectionTitle,
-          {
-            color: isDarkMode ? Colors.white : Colors.black,
-          },
-        ]}>
-        {title}
-      </Text>
-      <Text
-        style={[
-          styles.sectionDescription,
-          {
-            color: isDarkMode ? Colors.light : Colors.dark,
-          },
-        ]}>
-        {children}
-      </Text>
+    <View style={styles.container}>
+      <Camera
+        ref={camera}
+        style={StyleSheet.absoluteFill}
+        device={device}
+        isActive={true}
+        photo={true}
+      />
+      <View style={styles.facesContainer}>
+        {faces.map((face, index) => (
+          <Text key={index} style={styles.faceText}>
+            얼굴 {index + 1}: ({face.bounds.origin.x}, {face.bounds.origin.y})
+          </Text>
+        ))}
+      </View>
+      <TouchableOpacity style={styles.captureButton} onPress={takePicture}>
+        <Text style={styles.captureButtonText}>사진 촬영</Text>
+      </TouchableOpacity>
     </View>
   );
-}
-
-function App(): React.JSX.Element {
-  const isDarkMode = useColorScheme() === 'dark';
-
-  const backgroundStyle = {
-    backgroundColor: isDarkMode ? Colors.darker : Colors.lighter,
-  };
-
-  return (
-    <SafeAreaView style={backgroundStyle}>
-      <StatusBar
-        barStyle={isDarkMode ? 'light-content' : 'dark-content'}
-        backgroundColor={backgroundStyle.backgroundColor}
-      />
-      <ScrollView
-        contentInsetAdjustmentBehavior="automatic"
-        style={backgroundStyle}>
-        <Header />
-        <View
-          style={{
-            backgroundColor: isDarkMode ? Colors.black : Colors.white,
-          }}>
-          <Section title="Step One">
-            Edit <Text style={styles.highlight}>App.tsx</Text> to change this
-            screen and then come back to see your edits.
-          </Section>
-          <Section title="See Your Changes">
-            <ReloadInstructions />
-          </Section>
-          <Section title="Debug">
-            <DebugInstructions />
-          </Section>
-          <Section title="Learn More">
-            Read the docs to discover what to do next:
-          </Section>
-          <LearnMoreLinks />
-        </View>
-      </ScrollView>
-    </SafeAreaView>
-  );
-}
+};
 
 const styles = StyleSheet.create({
-  sectionContainer: {
-    marginTop: 32,
-    paddingHorizontal: 24,
+  container: {
+    flex: 1,
   },
-  sectionTitle: {
-    fontSize: 24,
-    fontWeight: '600',
+  facesContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
-  sectionDescription: {
-    marginTop: 8,
-    fontSize: 18,
-    fontWeight: '400',
+  faceText: {
+    color: '#ffffff',
+    fontSize: 14,
+    marginBottom: 5,
   },
-  highlight: {
-    fontWeight: '700',
+  captureButton: {
+    position: 'absolute',
+    bottom: 20,
+    alignSelf: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 25,
+    padding: 15,
+  },
+  captureButtonText: {
+    fontSize: 16,
   },
 });
 
